@@ -11,7 +11,7 @@ namespace CKernel
   def type.name : type → String
     | void => "void"
     | core_type name _ => name
-    | ptr_type t => t.typeName ++ "*"
+    | ptr_type t => t.name ++ "*"
 
   -- assuming 64-bit machine
   def type.size : type → Nat
@@ -62,7 +62,41 @@ def CKernel : Kernel :=
   null_is_const := rfl
 
   -- Not sure about this function, maybe `KFun` should be finite list of function and `execute` implements all of them.
+  -- Alternativelly, each reflected function provides this.
   execute := sorry
   execute_output := sorry
 }
+
+
+
+open Kernel CKernel
+
+def cfloat : type := type.core_type  "double" 8
+
+instance : ReflectedType CKernel Float := 
+{
+  t := cfloat
+  readBytes := sorry    -- TODO: provide function that reads double from ByteArray
+  writeBytes := sorry   -- TOOO: provide fucntion that writes double from ByteArray
+
+  -- I don't think we can prove these as Lean does not treat Float as 8 UInt8
+  write_arr_size := sorry 
+  read_write := sorry
+  valid_write := sorry
+}
+
+instance : ReflectedFun1 CKernel (λ x : Float => x.sqrt) :=
+{
+  kf := ⟨⟨cfloat, #[cfloat], "sqrt"⟩, rfl, rfl⟩
+  -- execute -- probably provide `execute` function here instead of in `Kernel`
+  valid := sorry
+}
+
+instance : ReflectedFun2 CKernel (λ x y : Float => x + y) :=
+{
+  kf := ⟨⟨cfloat, #[cfloat, cfloat], "fadd"⟩, rfl, rfl⟩
+  -- probably provide `execute` function here instead of in `Kernel`
+  -- valid := sorry
+}
+
 

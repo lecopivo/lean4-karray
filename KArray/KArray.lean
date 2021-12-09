@@ -22,13 +22,13 @@ namespace KArray
 
   -- These are the main functions what we care about and where the speed will come from
 
-  @[extern "karray_map_fast"]
+  -- @[extern "karray_map_fast"]
   def map (kernel : CompiledKExpr k (α → β)) : KArray k α → KArray k β := sorry
 
-  @[extern "karray_mapidx_fast"]
+  -- @[extern "karray_mapidx_fast"]
   def mapIdx (kernel : CompiledKExpr k (Nat → α → β)) : KArray k α → KArray k β := sorry
 
-  @[extern "karray_fold_fast"]
+  -- @[extern "karray_fold_fast"]
   def fold (kernel : CompiledKExpr k (α → β → β)) : KArray k α → β → β := sorry
 
 end KArray
