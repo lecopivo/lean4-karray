@@ -13,11 +13,14 @@ namespace KArray
   def size (arr : KArray k α) : Nat :=  arr.data.size / (sizeof k α)
 
   -- turns karray to kbuffer pointing at i-th element
-  def toKBuffer (arr : KArray k α) (i : Fin arr.size) : KBuffer k (sizeof k α) := ⟨arr.data, (sizeof k α).toUInt64*i.1.toUInt64, sorry⟩
+  def toKBuffer (arr : KArray k α) (i : Fin arr.size) : KBuffer k (sizeof k α) :=
+    ⟨arr.data, (sizeof k α).toUInt64*i.1.toUInt64, sorry⟩
 
   -- These functions will me mainly used as a reference implementation and to prove stuff
   def get (arr : KArray k α) (i : Fin arr.size) : α := (arr.toKBuffer i).read α
-  def set (arr : KArray k α) (i : Fin arr.size) (a : α) : KArray k α := ⟨(arr.toKBuffer i).write a, sorry⟩
+
+  def set (arr : KArray k α) (i : Fin arr.size) (a : α) : KArray k α :=
+    ⟨(arr.toKBuffer i).write a, sorry⟩
 
 
   -- These are the main functions what we care about and where the speed will come from
