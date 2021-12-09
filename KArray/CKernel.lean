@@ -1,0 +1,68 @@
+import KArray.Kernel
+
+-- Example of implementing kernel for C runn
+namespace CKernel
+
+  inductive type where
+    | void : type
+    | core_type (name : String) (size : Nat) : type
+    | ptr_type : type → type
+
+  def type.name : type → String
+    | void => "void"
+    | core_type name _ => name
+    | ptr_type t => t.typeName ++ "*"
+
+  -- assuming 64-bit machine
+  def type.size : type → Nat
+    | void => 8
+    | core_type _ size => size
+    | ptr_type t => 8
+
+  inductive function where
+    | inline_fun (out : type) (args : Array type) (name : String) : function
+
+  def function.name : function → String
+    | inline_fun _ _ name => name
+
+  def function.args : function → Array type
+    | inline_fun _ args _ => args
+
+  def function.out : function → type
+    | inline_fun out _ _ => out
+
+  def void_ptr := type.ptr_type type.void
+
+end CKernel
+
+open CKernel in
+def CKernel : Kernel :=
+{
+  KByteArray := ByteArray
+  byteArraySize := ByteArray.size
+  byteArrayRead := λ arr i => arr[i]
+  malloc := λ size => ByteArray.mkEmpty size -- TODO: This is incorrect! Should be initialize all values to zero?
+  malloc_size := sorry -- mkEmpty produces array with zero size - but non zero capacity but we cant argue about it
+  
+  KType := type
+  void := type.void
+  ptr := type.ptr_type
+  typeDec := sorry  -- I think this there is a way to automatically generate this 
+  typeName := λ t => t.name
+  typeSize := λ t => t.size
+
+  KFun := function      
+  funDec := sorry
+  funName := λ f => f.name
+  funArgTypes := λ f => f.args
+  funOutType := λ f => f.out
+  
+  null := ⟨void_ptr, #[], "nullptr"⟩
+  null_is_ptr := rfl
+  null_is_const := rfl
+
+  -- Not sure about this function, maybe `KFun` should be finite list of function and `execute` implements all of them.
+  execute := sorry
+  execute_output := sorry
+}
+
