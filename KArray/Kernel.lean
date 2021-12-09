@@ -90,8 +90,12 @@ namespace Kernel
   abbrev ktype {k : Kernel} (α : Type) [ReflectedType k α] : KType k := ReflectedType.t α
   abbrev sizeof (k : Kernel) (α : Type) [ReflectedType k α] : Nat := (ktype (k := k) α).sizeof
 
-  def KBuffer.read {k} (α : Type) [ReflectedType k α] (buff : KBuffer k (sizeof k α)) : α := ReflectedType.readBytes buff
-  def KBuffer.write {k α} [ReflectedType k α] (buff : KBuffer k (sizeof k α)) (a : α) : KByteArray k := ReflectedType.writeBytes buff a
+  def KBuffer.read {k} (α : Type) [ReflectedType k α] (buff : KBuffer k (sizeof k α)) : α :=
+    ReflectedType.readBytes buff
+
+  def KBuffer.write {k α} [ReflectedType k α] (buff : KBuffer k (sizeof k α)) (a : α) : KByteArray k :=
+    ReflectedType.writeBytes buff a
+
   def toKBuffer  {α : Type} (k : Kernel) (a : α) [ReflectedType k α] 
       : KBuffer k (sizeof k α) 
       := ⟨ReflectedType.writeBytes ⟨k.malloc (sizeof k α), 0, sorry⟩ a, 0, sorry⟩
@@ -128,5 +132,3 @@ namespace Kernel
   constant compile {T} : KTExpr k T → IO (CompiledKExpr k T)
 
 end Kernel
-
-

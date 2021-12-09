@@ -68,8 +68,6 @@ def CKernel : Kernel :=
   execute_output := sorry
 }
 
-
-
 open Kernel CKernel
 
 def cfloat : type := type.core_type  "double" 8
@@ -99,7 +97,6 @@ instance : ReflectedFun2 CKernel (λ x y : Float => x + y) :=
   -- probably provide `execute` function here instead of in `Kernel`
   -- valid := sorry
 }
-
 
 -- We want to talk about arrays internally with pointers.
 -- Do functions `readBytes` and `writeBytes` make sense here??? I'm not so sure 
