@@ -1,4 +1,5 @@
 import KArray.Kernel
+import KArray.KArray
 
 -- Example of implementing kernel for C runn
 namespace CKernel
@@ -95,4 +96,20 @@ instance : ReflectedFun2 CKernel (λ x y : Float => x + y) :=
   kf := ⟨⟨cfloat, #[cfloat, cfloat], "fadd"⟩, rfl, rfl⟩
   -- probably provide `execute` function here instead of in `Kernel`
   -- valid := sorry
+}
+
+-- We want to talk about arrays internally with pointers.
+-- Do functions `readBytes` and `writeBytes` make sense here??? I'm not so sure 
+instance [ReflectedType CKernel α] : ReflectedType CKernel (KArray CKernel α) := 
+{
+  t := type.ptr_type (ktype (k := CKernel) α)
+  readBytes := sorry    -- W
+  writeBytes := sorry   -- 
+
+  -- I don't think we can prove these as Lean does not treat Float as 8 UInt8
+  write_arr_size := sorry
+  read_write := sorry          
+  valid_write := sorry
+
+  default := sorry
 }
