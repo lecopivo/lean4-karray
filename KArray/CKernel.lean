@@ -1,5 +1,5 @@
 import KArray.Kernel
-import KArray
+import KArray.KArray
 
 -- Example of implementing kernel for C runn
 namespace CKernel
