@@ -1,4 +1,4 @@
-import KArray.KArray
+import KArray
 import KArray.CKernel
 
 def main : IO Unit :=
