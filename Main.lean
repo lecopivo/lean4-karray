@@ -15,7 +15,7 @@ def extractCCode (leanFile : FilePath) : IO Unit := do
     throw $ IO.userError s!"file {leanFile} has errors"
 
 def main (args : List String): IO UInt32 := do
-  -- TODO: iterate on all lean files recursiveli instead of just one
+  -- TODO: iterate on all lean files recursively instead of receiving file as an argument
   if h : 0 < args.length then
     Lean.initSearchPath (← Lean.findSysroot?)
     let file := args.get 0 h

@@ -40,8 +40,9 @@ end Kernel
 
 open Lean
 
+-- TODO: maybe use `ParametricAttribute` instead
 initialize kArrayCompileAttr : TagAttribute ←
-  registerTagAttribute `karray_compile "compile attribute"
+  registerTagAttribute `karray_compile "karray compile attribute"
 
 abbrev EmitM := StateM String
 
