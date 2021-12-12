@@ -62,4 +62,4 @@ def emitCCode (env : Environment) (declName : Name) : EmitM PUnit := do
   -- TODO: extract body from `env` and `declName`
   emitInclude "lean/lean.h"
   emitDefine "extern \"C\" LEAN_EXPORT" "external"
-  emit "external double lean_test() {return 42.0;}"
+  emit "external double lean_test(double a, double b) {return a + b;}"
