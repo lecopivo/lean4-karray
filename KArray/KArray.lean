@@ -59,7 +59,7 @@ def emitDefine (pre post : String) : EmitM PUnit :=
   emit s!"#define {post} {pre}\n"
 
 def emitCCode (env : Environment) (declName : Name) : EmitM PUnit := do
-  -- TODO: extract body from `env` and `declName`
+  -- TODO: extract function body from `env` and `declName`
   emitInclude "lean/lean.h"
   emitDefine "extern \"C\" LEAN_EXPORT" "external"
   emit "external double lean_test(double a, double b) {return a + b;}"
