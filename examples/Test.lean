@@ -7,7 +7,7 @@ This is how I thought of the use case: the user writes a definition and marks it
 
 A more consistent way to do this would be using `ParametricAttribute` instead of
 `TagAttribute`, so the user would be able to say `@[karray_compile "whatever_name"]`
-and then mark the constant with `@[extern "whatever_name"]`. That is, name inferring
+and then mark the constant with `@[extern "whatever_name"]`. That is, no name inferring
 would be necessary. But unfortunately I wasn't able to make it work :(.
 -/
 
