@@ -1,32 +1,33 @@
-import KArray.KArray
--- import KArray.CKernel
+import KArray.KArrayCompile
 import Lean.Elab.Frontend
 
-open Lean System
+/-
+#TODO:
+* Make sure every `targetName` is a valid function name for C code
+* Make sure no `targetName` is repeated
+-/
 
-def extractCCode (leanFile : FilePath) : IO Unit := do
+open Lean Meta System
+
+def extractCCode (leanFile : FilePath) : IO String := do
+  let mut res ← ""
   let input ← IO.FS.readFile leanFile
   let (env, ok) ← Lean.Elab.runFrontend input Options.empty leanFile.toString `main
   if ok then
-    for declName in kArrayCompileAttr.ext.getState env do
-      -- TODO: make sure no declaration is duplicated
-      -- TODO: write a .cpp file instead of printing
-      IO.println <| emitCCode env declName |>.toString
-  else
-    throw $ IO.userError s!"file {leanFile} has errors"
+    let nameMapList ← kArrayCompileAttr.ext.getState env |>.toList
+    for (declName, targetName) in nameMapList do
+      let metaExpr := whnfForall <| mkConst declName
+      res ← res ++ mkCCode targetName metaExpr ++ "\n"
+  res
 
-def main (args : List String): IO UInt32 := do
-  -- TODO: iterate on all lean files recursively instead of receiving a file as an argument
-  if h : 0 < args.length then
-    Lean.initSearchPath (← Lean.findSysroot?)
-    let file := args.get 0 h
-    try
-      extractCCode file
-      return 0
-    catch e =>
-      IO.eprintln s!"error: {toString e}"
-      return 1
-  else
-    let appName := (← IO.appPath).fileName.getD "extern"
-    IO.eprintln s!"Usage: {appName} lean-file"
-    return 1
+def main (args : List String): IO Unit := do
+  -- TODO: iterate on all lean files recursively
+  let mut cCode ← ""
+  Lean.initSearchPath (← Lean.findSysroot?)
+  for fileName in args do
+    cCode ← cCode ++ (← extractCCode ⟨fileName⟩)
+  if ¬cCode.isEmpty then
+    IO.println cCode
+    let fullCode ← "#include <lean/lean.h>\n" ++ cCode
+    -- TODO: write a .cpp file containing `fullCode` to disk
+    -- this file will be compiled by whoever uses this package as a dependency
