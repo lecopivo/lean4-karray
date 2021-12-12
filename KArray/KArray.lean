@@ -35,3 +35,30 @@ namespace KArray
   def fold (kernel : CompiledKExpr k (α → β → β)) : KArray k α → β → β := sorry
 
 end KArray
+
+end Kernel
+
+open Lean
+
+initialize kArrayCompileAttr : TagAttribute ←
+  registerTagAttribute `karray_compile "compile attribute"
+
+abbrev EmitM := StateM String
+
+def EmitM.toString (self : EmitM PUnit) : String :=
+  self.run "" |>.run.2
+
+def emit (str : String) : EmitM PUnit :=
+  modify fun s => s ++ str
+
+def emitInclude (path : String) : EmitM PUnit :=
+  emit s!"#include <{path}>\n"
+
+def emitDefine (pre post : String) : EmitM PUnit :=
+  emit s!"#define {post} {pre}\n"
+
+def emitCCode (env : Environment) (declName : Name) : EmitM PUnit := do
+  -- TODO: extract body from `env` and `declName`
+  emitInclude "lean/lean.h"
+  emitDefine "extern \"C\" LEAN_EXPORT" "external"
+  emit "external double lean_test() {return 42.0;}"
