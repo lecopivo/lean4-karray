@@ -2,17 +2,6 @@ import Lean
 
 open Lean
 
-/-
-Usage example:
-```
-import KArray.KArray
-
-@[karray_compile c_test] def test (a b : Float) : Float := a + b
-
-def main : IO Unit :=
-  IO.println <| test 21 21
-```
--/
 initialize kArrayCompileAttr : ParametricAttribute Name ←
   registerParametricAttribute {
     name := `karray_compile
@@ -24,4 +13,5 @@ initialize kArrayCompileAttr : ParametricAttribute Name ←
   }
 
 /- The magic happens here -/
-def mkCCode (targetName : Name) (metaExpr : MetaM Expr) : String := ""
+def mkCCode (targetName : Name) (metaExpr : Expr) : String :=
+  s!"{targetName}|{metaExpr}"
