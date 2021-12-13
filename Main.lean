@@ -23,8 +23,8 @@ def extractCCode (leanFile : FilePath) : IO String := do
 def main (args : List String): IO Unit := do
   -- TODO: iterate on all lean files recursively
   let mut cCode ← ""
+  Lean.initSearchPath (← Lean.findSysroot?)
   for fileName in args do
-    Lean.initSearchPath (fileName : String)
     cCode ← cCode ++ (← extractCCode ⟨fileName⟩)
   if ¬cCode.isEmpty then
     let fullCode ← "#include <lean/lean.h>\n" ++ cCode
