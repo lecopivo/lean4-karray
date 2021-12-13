@@ -17,5 +17,5 @@ initialize kArrayCompileAttr : ParametricAttribute Name ←
   }
 
 /- The magic happens here -/
-def mkCCode (targetName : Name) (metaExpr : Expr) : String :=
-  s!"{targetName}|{metaExpr}"
+def mkCCode (targetName : Name) (expr : Expr) : String :=
+  s!"{targetName}|{expr}"
