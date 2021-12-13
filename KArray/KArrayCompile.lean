@@ -7,9 +7,13 @@ initialize kArrayCompileAttr : ParametricAttribute Name ←
     name := `karray_compile
     descr := "name to be used by code generators"
     getParam := fun _ stx => Attribute.Builtin.getId stx
-    afterSet := fun declName _ => do
-      let env ← ofExcept $ addExtern (← getEnv) declName
-      setEnv env
+    afterSet := fun declName _ => do -- TODO: this is not working!
+      let mut env ← getEnv
+      if env.isProjectionFn declName || env.isConstructor declName then do
+        env ← ofExcept $ addExtern env declName
+        setEnv env
+      else
+        pure ()
   }
 
 /- The magic happens here -/
