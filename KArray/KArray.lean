@@ -35,3 +35,5 @@ namespace KArray
   def fold (kernel : CompiledKExpr k (α → β → β)) : KArray k α → β → β := sorry
 
 end KArray
+
+end Kernel
