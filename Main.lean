@@ -10,6 +10,11 @@ def extractCCodeFromFile (leanFile : FilePath) : IO String := do
   else
     panic! s!"Lean's Frontend failed to run {leanFile}"
 
+def getFilePathExtension (fp : FilePath) : String :=
+  match fp.extension with
+  | none => ""
+  | some s => s
+
 partial def getFilePathsList (fp : FilePath) (acc : List FilePath := []) :
 IO (List FilePath) := do
   if ← fp.isDir then
@@ -19,42 +24,32 @@ IO (List FilePath) := do
         extra ← extra.concat innerFp
     acc ++ extra
   else
-    match fp.extension with
-    | none => acc
-    | some s =>
-      if s = "lean" then
-        acc.concat fp
-      else
-        acc
+    if (getFilePathExtension fp) = "lean" then
+      acc.concat fp
+    else
+      acc
 
 def main (args : List String): IO UInt32 := do
-  if args.length = 2 then
+  if args.length ≠ 2 then
+    let appName := (← IO.appPath).fileName.getD "extern"
+    IO.eprintln s!"Usage: {appName} <dir or lean-file> <cpp-file>"
+    return 1
+  else
     let input : FilePath := ⟨args.get! 0⟩
-    -- TODO: improve these validations
     -- validating input target
     if ¬(← input.isDir) then
-      match input.extension with
-      | none =>
-        IO.eprintln "If the input is a file, it must be a lean file"
+      if (getFilePathExtension input) ≠ "lean" then
+        IO.eprintln "If the input is a file, it must be a .lean file"
         return 1
-      | some s =>
-        if s ≠ "lean" then
-          IO.eprintln "If the input is a file, it must be a lean file"
-          return 1
-    -- validating output target
     let output : FilePath := ⟨args.get! 1⟩
+    -- validating output target
     if (← output.isDir) then
       IO.eprintln "Target output cannot be a directory"
       return 1
     else
-      match output.extension with
-      | none =>
+      if (getFilePathExtension output) ≠ "cpp" then
         IO.eprintln "Target output must be a .cpp file"
         return 1
-      | some s =>
-        if s ≠ "cpp" then
-          IO.eprintln "Target output must be a .cpp file"
-          return 1
     let mut cCode ← ""
     Lean.initSearchPath (← Lean.findSysroot?)
     let filePaths ← getFilePathsList $ ⟨args.get! 0⟩
@@ -63,7 +58,3 @@ def main (args : List String): IO UInt32 := do
     if ¬cCode.isEmpty then
       IO.FS.writeFile output $ cHeader ++ cCode
     return 0
-  else
-    let appName := (← IO.appPath).fileName.getD "extern"
-    IO.eprintln s!"Usage: {appName} <dir or lean-file> <cpp-file>"
-    return 1

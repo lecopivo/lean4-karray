@@ -10,7 +10,7 @@ script examples do
   let kArrayPath := FilePath.mk "build" / "bin" / "KArray"
   let kArrayProcess ← IO.Process.spawn {
     cmd := kArrayPath.withExtension FilePath.exeExtension |>.toString
-    args := #["examples", "examples/examples.cpp"]
+    args := #["examples", "examples/output.cpp"]
     env := #[("LEAN_PATH", SearchPath.toString [kArrayLib])]
   }
   kArrayProcess.wait
