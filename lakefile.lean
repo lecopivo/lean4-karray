@@ -5,12 +5,36 @@ package KArray {
   supportInterpreter := true
 }
 
-script examples do
+script reset do
+  let clean ← IO.Process.output {
+    cmd := "lake"
+    args := #["clean"]
+  }
+  let cleanCpp ← IO.Process.output {
+    cmd := "rm"
+    args := #["examples/*.cpp"]
+  }
+  return 0
+
+script test do
+  let reset ← IO.Process.output {
+    cmd := "lake"
+    args := #["reset"]
+  }
+  let build ← IO.Process.output {
+    cmd := "lake"
+    args := #["build"]
+  }
+  if build.exitCode ≠ 0 then
+    IO.eprintln build.stderr
+    return build.exitCode
   let kArrayLib := FilePath.mk "build" / "lib"
   let kArrayPath := FilePath.mk "build" / "bin" / "KArray"
-  let kArrayProcess ← IO.Process.spawn {
+  let runExamples ← IO.Process.output {
     cmd := kArrayPath.withExtension FilePath.exeExtension |>.toString
-    args := #[FilePath.mk "examples" / "Test.lean" |>.toString]
+    args := #["examples", "examples/output.cpp"]
     env := #[("LEAN_PATH", SearchPath.toString [kArrayLib])]
   }
-  kArrayProcess.wait
+  if runExamples.exitCode ≠ 0 then
+    IO.eprintln runExamples.stderr
+  return runExamples.exitCode

@@ -5,6 +5,9 @@ open Lean
 initialize kArrayCompileAttr : TagAttribute ←
   registerTagAttribute `kcompile "tag to request KArray compile"
 
+constant cHeader : String :=
+  "#include <lean/lean.h>\n"
+
 /- The magic happens here -/
 def mkCCode (targetName : Name) (expr : Expr) : String :=
   s!"{targetName}|{expr}"
