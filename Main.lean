@@ -50,13 +50,11 @@ def main (args : List String): IO UInt32 := do
       if (getFilePathExtension output) ≠ "cpp" then
         IO.eprintln "Target output must be a .cpp file"
         return 1
-    let mut cHeaders : List String ← []
-    let mut cDecls : List String ← []
     Lean.initSearchPath (← Lean.findSysroot?)
+    let mut cBodiesAndHeaders : List (String × String) ← []
     for filePath in ← getFilePathsList $ ⟨args.get! 0⟩ do
-      for (cHeader, cBody) in ← extractCCodeFromFile filePath do
-        cHeaders ← cHeaders.concat cHeader
-        cDecls ← cDecls.concat cBody
-    if ¬cHeaders.isEmpty then
-      IO.FS.writeFile output $ ← buildFinalCCode cHeaders cDecls
+      cBodiesAndHeaders ← cBodiesAndHeaders.append $
+        ← extractCCodeFromFile filePath
+    if ¬cBodiesAndHeaders.isEmpty then
+      IO.FS.writeFile output $ ← buildFinalCCode cBodiesAndHeaders
     return 0

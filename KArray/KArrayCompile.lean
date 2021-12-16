@@ -62,7 +62,8 @@ def extractCCodeFromEnv (env : Environment) : IO (List (String × String)) := do
           "`extern <targetName>`"
   res
 
-def buildFinalCCode (cHeaders cDecls : List String) : String :=
+def buildFinalCCode (cHeadersAndBodies : List (String × String)) : String :=
+  let cHeaders := cHeadersAndBodies.map λ (h, _) => h
   cIncludes ++ newLine ++ cDefines ++ newLine ++ -- includes and defines
     (semicolonNewLine.intercalate cHeaders ++ semicolonNewLine) ++ --headers
-    (newLine.intercalate $ (cHeaders.zip cDecls).map λ (a, b) => a ++ b) -- declarations
+    (newLine.intercalate $ cHeadersAndBodies.map λ (a, b) => a ++ b) -- declarations
