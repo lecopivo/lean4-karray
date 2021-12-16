@@ -33,7 +33,9 @@ The body is a string like:
 # TODO: make sure no `targetName` is ever duplicated
 -/
 def mkHeaderAndBody (targetName : Name) (expr : Expr) : String × String :=
-  (targetName.toString, expr.dbgToString)
+  let header := s!"external double {targetName}()"
+  let body := s!"\{return {expr};}"
+  (header, body)
 
 def extractCCodeFromEnv (env : Environment) : IO (List (String × String)) := do
   let mut res : List (String × String) ← []
@@ -62,5 +64,5 @@ def extractCCodeFromEnv (env : Environment) : IO (List (String × String)) := do
 
 def buildFinalCCode (cHeaders cDecls : List String) : String :=
   cIncludes ++ newLine ++ cDefines ++ newLine ++ -- includes and defines
-    semicolonNewLine.intercalate cHeaders ++ semicolonNewLine ++ --headers
+    (semicolonNewLine.intercalate cHeaders ++ semicolonNewLine) ++ --headers
     (newLine.intercalate $ (cHeaders.zip cDecls).map λ (a, b) => a ++ b) -- declarations

@@ -56,7 +56,7 @@ def main (args : List String): IO UInt32 := do
     for filePath in ← getFilePathsList $ ⟨args.get! 0⟩ do
       for (cHeader, cBody) in ← extractCCodeFromFile filePath do
         cHeaders ← cHeaders.concat cHeader
-        cDecls ← cDecls.concat $ cHeader ++ cBody
+        cDecls ← cDecls.concat cBody
     if ¬cHeaders.isEmpty then
-      IO.FS.writeFile output $ buildFinalCCode cHeaders cDecls
+      IO.FS.writeFile output $ ← buildFinalCCode cHeaders cDecls
     return 0
