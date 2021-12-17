@@ -10,7 +10,7 @@ script reset do
     cmd := "lake"
     args := #["clean"]
   }
-  let cleanCpp ← IO.Process.output {
+  let cleanCpp ← IO.Process.output { -- TODO: this is not working
     cmd := "rm"
     args := #["examples/*.cpp"]
   }
@@ -36,5 +36,7 @@ script test do
     env := #[("LEAN_PATH", SearchPath.toString [kArrayLib])]
   }
   if runExamples.exitCode ≠ 0 then
-    IO.eprintln runExamples.stderr
+    IO.eprint runExamples.stderr
+  if runExamples.stdout ≠ "" then
+    IO.print runExamples.stdout
   return runExamples.exitCode

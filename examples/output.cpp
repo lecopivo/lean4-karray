@@ -1,2 +1,4 @@
 #include <lean/lean.h>
-c_test|test
+#define external extern "C" LEAN_EXPORT
+external double c_test();
+external double c_test(){return test;}

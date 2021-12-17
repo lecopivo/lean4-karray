@@ -5,17 +5,40 @@ open Lean
 initialize kArrayCompileAttr : TagAttribute ←
   registerTagAttribute `kcompile "tag to request KArray compile"
 
-constant cHeader : String :=
-  "#include <lean/lean.h>\n"
+constant cIncludes : String :=
+  "#include <lean/lean.h>"
 
-/- The magic happens here -/
-def mkCCode (targetName : Name) (expr : Expr) : String :=
-  s!"{targetName}|{expr}"
+constant cDefines : String :=
+  "#define external extern \"C\" LEAN_EXPORT"
 
--- TODO: make sure `targetName` is a valid function name for C code
--- TODO: make sure no `targetName` is ever duplicated
-def extractCCodeFromEnv (env : Environment) : IO String := do
-  let mut res ← ""
+constant semicolon : String := ";"
+
+constant newLine : String := "\n"
+
+constant semicolonNewLine : String := semicolon ++ newLine
+
+/-
+The magic happens here.
+
+The header is a string like:
+  "external double add(double x, double y)"
+
+Notice that "x" and "y" could be hidden in a header, but it's better to explicit them
+so we can reuse the header when defining the function itself.
+
+The body is a string like:
+  "{return x + y;}"
+
+# TODO: make sure `targetName` is a valid function name for C code and panic otherwise
+# TODO: make sure no `targetName` is ever duplicated
+-/
+def mkHeaderAndBody (targetName : Name) (expr : Expr) : String × String :=
+  let header := s!"external double {targetName}()"
+  let body := s!"\{return {expr};}"
+  (header, body)
+
+def extractCCodeFromEnv (env : Environment) : IO (List (String × String)) := do
+  let mut res : List (String × String) ← []
   let externMap ← externAttr.ext.getState env
   for declName in kArrayCompileAttr.ext.getState env do
     match externMap.find? declName with
@@ -30,7 +53,7 @@ def extractCCodeFromEnv (env : Environment) : IO String := do
           let nameString ← name.toString
           if nameString = "all" ∨ nameString = "cpp" then -- this condition suffices
             let metaExpr ← mkConst declName
-            res ← res ++ mkCCode targetName metaExpr ++ "\n"
+            res ← res.concat $ mkHeaderAndBody targetName metaExpr
             hasProperStandardEntry ← true
             break
         | _ => continue -- non-standard entries are ignored
@@ -38,3 +61,9 @@ def extractCCodeFromEnv (env : Environment) : IO String := do
         panic! s!"`kcompile` tag requires `{declName}` to be marked with " ++
           "`extern <targetName>`"
   res
+
+def buildFinalCCode (cHeadersAndBodies : List (String × String)) : String :=
+  let cHeaders := cHeadersAndBodies.map λ (h, _) => h
+  cIncludes ++ newLine ++ cDefines ++ newLine ++ -- includes and defines
+    (semicolonNewLine.intercalate cHeaders ++ semicolonNewLine) ++ --headers
+    (newLine.intercalate $ cHeadersAndBodies.map λ (a, b) => a ++ b) -- declarations

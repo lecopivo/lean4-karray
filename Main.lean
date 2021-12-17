@@ -2,7 +2,7 @@ import KArray.KArrayCompile
 
 open Lean System
 
-def extractCCodeFromFile (leanFile : FilePath) : IO String := do
+def extractCCodeFromFile (leanFile : FilePath) : IO (List (String × String)) := do
   let input ← IO.FS.readFile leanFile
   let (env, ok) ← Lean.Elab.runFrontend input Options.empty leanFile.toString `main
   if ok then
@@ -50,11 +50,11 @@ def main (args : List String): IO UInt32 := do
       if (getFilePathExtension output) ≠ "cpp" then
         IO.eprintln "Target output must be a .cpp file"
         return 1
-    let mut cCode ← ""
     Lean.initSearchPath (← Lean.findSysroot?)
-    let filePaths ← getFilePathsList $ ⟨args.get! 0⟩
-    for filePath in filePaths do
-      cCode ← cCode ++ (← extractCCodeFromFile filePath)
-    if ¬cCode.isEmpty then
-      IO.FS.writeFile output $ cHeader ++ cCode
+    let mut cBodiesAndHeaders : List (String × String) ← []
+    for filePath in ← getFilePathsList $ ⟨args.get! 0⟩ do
+      cBodiesAndHeaders ← cBodiesAndHeaders.append $
+        ← extractCCodeFromFile filePath
+    if ¬cBodiesAndHeaders.isEmpty then
+      IO.FS.writeFile output $ ← buildFinalCCode cBodiesAndHeaders
     return 0
