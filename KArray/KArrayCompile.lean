@@ -7,6 +7,8 @@ initialize kArrayCompileAttr : TagAttribute ←
 
 class Reflected (a : α)
 
+instance : Reflected (λ x => Float.sqrt x) := ⟨⟩
+
 -- TODO: Somehow get a proper name
 def ename (e : Expr) : String := Id.run do
   match e.getAppFn.constName? with
@@ -22,7 +24,7 @@ partial def toCCode (e : Expr) : MetaM String := do
     match s with
     | some _ => ename f ++ "(" ++ (← toCCode x) ++ ")"
     | none => do
-    (← toCCode f) ++ "(" ++ (← toCCode x) ++ ")"
+      (← toCCode f) ++ "(" ++ (← toCCode x) ++ ")"
   | _ => throwError "Invalid Expression"
 
 partial def metaCompile (e : Lean.Expr) : MetaM String := do
@@ -30,8 +32,6 @@ partial def metaCompile (e : Lean.Expr) : MetaM String := do
   match metaExpr with
   | Expr.lam .. => lambdaTelescope metaExpr fun xs b => do (toCCode b)
   | _ => throwError "Function expected!"
-
-instance : Reflected (λ x => Float.sqrt x) := ⟨⟩
 
 /-
 The magic happens here.
@@ -51,7 +51,7 @@ The body is a string like:
 def mkHeaderAndBody (env: Environment) (targetName : Name) (expr : Expr) : IO (String × String) := do
   let header := s!"external double {targetName}()"
   let body ← Prod.fst <$> (metaCompile expr).run'.toIO {} {env}
-  (header, body)
+  (header, s!"\{return {body};}")
 
 def extractCCodeFromEnv (env : Environment) : IO (List (String × String)) := do
   let mut res : List (String × String) ← []
