@@ -1,7 +1,8 @@
 import KArray.KArrayCompile
 
 -- this one is accepted
-@[kcompile, extern "c_test"] def test (a b : Float) : Float := a + b
+  @[kcompile, extern "c_test"] def foo (x : Float) : Float :=
+    Float.sqrt (Float.sqrt x)
 
 -- this one is skipped
 @[kcompile] def test' (a b : Float) : Float := a + b
@@ -10,4 +11,4 @@ import KArray.KArrayCompile
 -- @[kcompile, extern] def test'' (a b : Float) : Float := a + b
 
 def main : IO Unit :=
-  IO.println <| test 20 22
+  IO.println <| foo 16.0

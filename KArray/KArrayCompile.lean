@@ -1,21 +1,37 @@
 import Lean
 
-open Lean
+open Lean Meta
 
 initialize kArrayCompileAttr : TagAttribute ←
   registerTagAttribute `kcompile "tag to request KArray compile"
 
-constant cIncludes : String :=
-  "#include <lean/lean.h>"
+class Reflected (a : α)
 
-constant cDefines : String :=
-  "#define external extern \"C\" LEAN_EXPORT"
+-- TODO: Somehow get a proper name
+def ename (e : Expr) : String := Id.run do
+  match e.getAppFn.constName? with
+  | some n => toString n
+  | none => toString e
 
-constant semicolon : String := ";"
+partial def toCCode (e : Expr) : MetaM String := do
+  match e with
+  | Expr.fvar _ _=> toString e
+  | Expr.app f x _ => do
+    -- Is `f` reflected?
+    let s ← synthInstance? (← mkAppM `Reflected #[f])
+    match s with
+    | some _ => ename f ++ "(" ++ (← toCCode x) ++ ")"
+    | none => do
+    (← toCCode f) ++ "(" ++ (← toCCode x) ++ ")"
+  | _ => throwError "Invalid Expression"
 
-constant newLine : String := "\n"
+partial def metaCompile (e : Lean.Expr) : MetaM String := do
+  let metaExpr ← whnf e
+  match metaExpr with
+  | Expr.lam .. => lambdaTelescope metaExpr fun xs b => do (toCCode b)
+  | _ => throwError "Function expected!"
 
-constant semicolonNewLine : String := semicolon ++ newLine
+instance : Reflected (λ x => Float.sqrt x) := ⟨⟩
 
 /-
 The magic happens here.
@@ -32,10 +48,10 @@ The body is a string like:
 # TODO: make sure `targetName` is a valid function name for C code and panic otherwise
 # TODO: make sure no `targetName` is ever duplicated
 -/
-def mkHeaderAndBody (targetName : Name) (expr : Expr) : String × String :=
+def mkHeaderAndBody (env: Environment) (targetName : Name) (expr : Expr) : IO (String × String) := do
   let header := s!"external double {targetName}()"
-  let body := s!"\{return {expr};}"
-  (header, body)
+  let body' ← Prod.fst <$> (metaCompile expr).run'.toIO {} {env}
+  (header, body')
 
 def extractCCodeFromEnv (env : Environment) : IO (List (String × String)) := do
   let mut res : List (String × String) ← []
@@ -52,8 +68,8 @@ def extractCCodeFromEnv (env : Environment) : IO (List (String × String)) := do
         | ExternEntry.standard name targetName =>
           let nameString ← name.toString
           if nameString = "all" ∨ nameString = "cpp" then -- this condition suffices
-            let metaExpr ← mkConst declName
-            res ← res.concat $ mkHeaderAndBody targetName metaExpr
+            let expr ← mkConst declName
+            res ← res.concat $ ← mkHeaderAndBody env targetName expr
             hasProperStandardEntry ← true
             break
         | _ => continue -- non-standard entries are ignored
@@ -61,6 +77,19 @@ def extractCCodeFromEnv (env : Environment) : IO (List (String × String)) := do
         panic! s!"`kcompile` tag requires `{declName}` to be marked with " ++
           "`extern <targetName>`"
   res
+
+
+def cIncludes : String :=
+  "#include <lean/lean.h>"
+
+def cDefines : String :=
+  "#define external extern \"C\" LEAN_EXPORT"
+
+def semicolon : String := ";"
+
+def newLine : String := "\n"
+
+def semicolonNewLine : String := semicolon ++ newLine
 
 def buildFinalCCode (cHeadersAndBodies : List (String × String)) : String :=
   let cHeaders := cHeadersAndBodies.map λ (h, _) => h
