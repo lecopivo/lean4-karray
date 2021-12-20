@@ -50,8 +50,8 @@ The body is a string like:
 -/
 def mkHeaderAndBody (env: Environment) (targetName : Name) (expr : Expr) : IO (String × String) := do
   let header := s!"external double {targetName}()"
-  let body' ← Prod.fst <$> (metaCompile expr).run'.toIO {} {env}
-  (header, body')
+  let body ← Prod.fst <$> (metaCompile expr).run'.toIO {} {env}
+  (header, body)
 
 def extractCCodeFromEnv (env : Environment) : IO (List (String × String)) := do
   let mut res : List (String × String) ← []
