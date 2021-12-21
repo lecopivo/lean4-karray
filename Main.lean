@@ -1,14 +1,6 @@
 import KArray.KArrayCompile
 
-open Lean System
-
-def extractCCodeFromFile (leanFile : FilePath) : IO (List (String × String)) := do
-  let input ← IO.FS.readFile leanFile
-  let (env, ok) ← Lean.Elab.runFrontend input Options.empty leanFile.toString `main
-  if ok then
-    extractCCodeFromEnv env
-  else
-    panic! s!"Lean's Frontend failed to run {leanFile}"
+open System
 
 def getFilePathExtension (fp : FilePath) : String :=
   match fp.extension with
@@ -51,10 +43,15 @@ def main (args : List String): IO UInt32 := do
         IO.eprintln "Target output must be a .cpp file"
         return 1
     Lean.initSearchPath (← Lean.findSysroot?)
-    let mut cBodiesAndHeaders : List (String × String) ← []
+    let mut compilationUnits : List CompilationUnit ← []
     for filePath in ← getFilePathsList $ ⟨args.get! 0⟩ do
-      cBodiesAndHeaders ← cBodiesAndHeaders.append $
-        ← extractCCodeFromFile filePath
+      compilationUnits ← compilationUnits.append $
+        ← collectCompilationUnits filePath
+    validateCompilationUnits compilationUnits
+    let cBodiesAndHeaders ← compilationUnits.map $ processCompilationUnit compilationUnits
     if ¬cBodiesAndHeaders.isEmpty then
-      IO.FS.writeFile output $ ← buildFinalCCode cBodiesAndHeaders
+      let mut pureCBodiesAndHeaders : List (String × String) ← []
+      for cBodyAndHeader in cBodiesAndHeaders do
+        pureCBodiesAndHeaders ← pureCBodiesAndHeaders.concat $ ← cBodyAndHeader
+      IO.FS.writeFile output $ ← buildFinalCCode $ pureCBodiesAndHeaders
     return 0
