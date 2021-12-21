@@ -1,6 +1,6 @@
 import Lean
 
-open Lean Meta System
+open Lean Meta System Std
 
 initialize kArrayCompileAttr : TagAttribute ←
   registerTagAttribute `kcompile "tag to request KArray compile"
@@ -78,22 +78,16 @@ def collectCompilationUnits (filePath : FilePath) : IO (List CompilationUnit) :=
 -- TODO: check if `targetName` is a valid function name for C code
 def isValidCFunctionName (targetName : String) : Bool := true
 
-def countOcurrences (l : List String) (n : String) : IO Nat := do
-  let mut c : Nat := 0
-  for ni in l do
-    if ni = n then
-      c := c + 1
-  c
-
 def validateCompilationUnits (compilationUnits : List CompilationUnit) : IO PUnit := do
-  let targetNames ← compilationUnits.map λ c => c.targetName
+  let mut targetNamesSet : HashSet String ← HashSet.empty
   for compilationUnit in compilationUnits do
-    if (← countOcurrences targetNames compilationUnit.targetName) > 1 then
-      panic! s!"\nError ({compilationUnit.filePath}):\n\tDuplicated occurrence of " ++
-        s!"target name '{compilationUnit.targetName}' on declaration `{compilationUnit.declName}`."
     if ¬(isValidCFunctionName compilationUnit.targetName) then
       panic! s!"\nError ({compilationUnit.filePath}):\n\tInvalid target name " ++
         s!"'{compilationUnit.targetName}' on declaration `{compilationUnit.declName}`."
+    if targetNamesSet.contains compilationUnit.targetName then
+      panic! s!"\nError ({compilationUnit.filePath}):\n\tDuplicated occurrence of " ++
+        s!"target name '{compilationUnit.targetName}' on declaration `{compilationUnit.declName}`."
+    targetNamesSet ← targetNamesSet.insert compilationUnit.targetName
 
 /-
 The magic happens here.
