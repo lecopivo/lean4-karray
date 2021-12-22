@@ -75,12 +75,12 @@ MetaM (String × String × String) := do
   let types ← argsTypes metaExpr
   let argNamesAndBody : (List String) × String ←
     match metaExpr with
-    | Expr.lam .. => lambdaTelescope metaExpr fun xs b =>
-      (xs.data.map formattedName, toCCode compilationUnits b)
+    | Expr.lam .. => lambdaTelescope metaExpr fun args body =>
+      (args.data.map formattedName, toCCode compilationUnits body)
     | _ => throwError "Function expected!"
   ("double", -- TODO: unmock this
-    ",".intercalate $ (types.zip argNamesAndBody.1).map λ (a, b) =>
-      s!"{typeTranslationHashMap.find! a} {b}",
+    ",".intercalate $ (types.zip argNamesAndBody.1).map λ (type, name) =>
+      s!"{typeTranslationHashMap.find! type} {name}",
     ← argNamesAndBody.2)
 
 def collectCompilationUnits (filePath : FilePath) : IO (List CompilationUnit) := do
