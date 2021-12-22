@@ -64,21 +64,27 @@ partial def toCCode (compilationUnits : List CompilationUnit)
     -- TODO: if `f` is not reflected, check if it's a marked declaration. otherwise:
     throwError "Invalid Expression"
 
-def argsTypes (e : Expr) (acc : List String := []) : MetaM (List String) :=
+def getTypes (e : Expr) (acc : List String := []) : MetaM (List String) :=
   match e with
-  | Expr.lam _ t e' _ => argsTypes e' (acc.concat $ toString t)
-  | _ => acc
+  | Expr.lam _ t e' _ => getTypes e' (acc.concat $ toString t)
+  | Expr.app t _ _ => do
+    match t with
+    | Expr.const c _ _ => do
+      Meta.forallTelescope (← getConstInfo c).type fun _ type => 
+        acc.concat $ toString type
+    | _ => throwError "Invalid marked declaration"
+  | _ => throwError "Invalid Expression"
 
 partial def metaCompile (compilationUnits : List CompilationUnit) (declName : Name) :
 MetaM (String × String × String) := do
   let metaExpr ← whnf $ mkConst declName
-  let types ← argsTypes metaExpr
+  let types ← getTypes metaExpr
   let argNamesAndBody : (List String) × String ←
     match metaExpr with
     | Expr.lam .. => lambdaTelescope metaExpr fun args body =>
       (args.data.map formattedName, toCCode compilationUnits body)
     | _ => throwError "Function expected!"
-  ("double", -- TODO: unmock this
+  (typeTranslationHashMap.find! types.getLast!,
     ",".intercalate $ (types.zip argNamesAndBody.1).map λ (type, name) =>
       s!"{typeTranslationHashMap.find! type} {name}",
     ← argNamesAndBody.2)
