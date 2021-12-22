@@ -15,11 +15,34 @@ class Reflected (a : α)
 
 instance : Reflected (λ x => Float.sqrt x) := ⟨⟩
 
--- TODO: Somehow get a proper name
-def ename (e : Expr) : String := Id.run do
+def typeTranslationList : List (String × String) := [
+  ("Float", "double")
+]
+
+def functionTranslationList : List (String × String) := [
+  ("Float.sqrt", "sqrt")
+]
+
+-- is this function being called multiple times???
+def hashMapFromList (l : List (String × String)) : HashMap String String := Id.run do
+  let mut m : HashMap String String ← HashMap.empty
+  for (a, b) in l do
+    m ← m.insert a b
+  m
+
+constant typeTranslationHashMap : HashMap String String :=
+  hashMapFromList typeTranslationList
+
+constant functionTranslationHashMap : HashMap String String :=
+  hashMapFromList functionTranslationList
+
+def formattedName (e : Expr) : String :=
+  toString e |>.replace "." "_"
+
+def eName (e : Expr) : String :=
   match e.getAppFn.constName? with
-  | some n => toString n
-  | none => toString e
+  | some n => functionTranslationHashMap.find! n.toString
+  | none => formattedName e
 
 /-
 # TODO: make sure compiled functions only depend on either:
@@ -27,24 +50,38 @@ def ename (e : Expr) : String := Id.run do
 * other compiled functions
 -/
 partial def toCCode (compilationUnits : List CompilationUnit)
-(e : Expr) : MetaM String := do
+(e : Expr) : MetaM String :=
   match e with
-  | Expr.fvar _ _=> toString e
+  | Expr.fvar _ _=> eName e
   | Expr.app f x _ => do
     -- Is `f` reflected?
     let s ← synthInstance? (← mkAppM `Reflected #[f])
     match s with
-    | some _ => ename f ++ "(" ++ (← toCCode compilationUnits x) ++ ")"
-    | none => do
-      (← toCCode compilationUnits f) ++ "(" ++ (← toCCode compilationUnits x) ++ ")"
-  | _ => throwError "Invalid Expression"
+    | some _ => eName f ++ "(" ++ (← toCCode compilationUnits x) ++ ")"
+    | none => (← toCCode compilationUnits f) ++
+      "(" ++ (← toCCode compilationUnits x) ++ ")"
+  | _ =>
+    -- TODO: if `f` is not reflected, check if it's a marked declaration. otherwise:
+    throwError "Invalid Expression"
 
-partial def metaCompile (compilationUnits : List CompilationUnit)
-(declName : Name) : MetaM String := do
+def argsTypes (e : Expr) (acc : List String := []) : MetaM (List String) :=
+  match e with
+  | Expr.lam _ t e' _ => argsTypes e' (acc.concat $ toString t)
+  | _ => acc
+
+partial def metaCompile (compilationUnits : List CompilationUnit) (declName : Name) :
+MetaM (String × String × String) := do
   let metaExpr ← whnf $ mkConst declName
-  match metaExpr with
-  | Expr.lam .. => lambdaTelescope metaExpr fun xs b => do (toCCode compilationUnits b)
-  | _ => throwError "Function expected!"
+  let types ← argsTypes metaExpr
+  let argNamesAndBody : (List String) × String ←
+    match metaExpr with
+    | Expr.lam .. => lambdaTelescope metaExpr fun xs b =>
+      (xs.data.map formattedName, toCCode compilationUnits b)
+    | _ => throwError "Function expected!"
+  ("double", -- TODO: unmock this
+    ",".intercalate $ (types.zip argNamesAndBody.1).map λ (a, b) =>
+      s!"{typeTranslationHashMap.find! a} {b}",
+    ← argNamesAndBody.2)
 
 def collectCompilationUnits (filePath : FilePath) : IO (List CompilationUnit) := do
   let input ← IO.FS.readFile filePath
@@ -90,8 +127,6 @@ def validateCompilationUnits (compilationUnits : List CompilationUnit) : IO PUni
     targetNamesSet ← targetNamesSet.insert compilationUnit.targetName
 
 /-
-The magic happens here.
-
 The header is a string like:
   "external double add(double x, double y)"
 
@@ -103,14 +138,15 @@ The body is a string like:
 -/
 def processCompilationUnit (compilationUnits : List CompilationUnit)
 (compilationUnit : CompilationUnit) : IO (String × String) := do
-  let header := s!"external double {compilationUnit.targetName}()"
   let env ← compilationUnit.env
-  let body ← Prod.fst <$>
+  let (returnType, args, body) ← Prod.fst <$>
     (metaCompile compilationUnits compilationUnit.declName).run'.toIO {} {env}
+  let header ← s!"external {returnType} {compilationUnit.targetName}({args})"
   (header, s!"\{return {body};}")
 
 def cIncludes : String :=
-  "#include <lean/lean.h>"
+  "#include <lean/lean.h>\n" ++
+  "#include <math.h>"
 
 def cDefines : String :=
   "#define external extern \"C\" LEAN_EXPORT"
