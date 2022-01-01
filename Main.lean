@@ -2,11 +2,6 @@ import KArray.KArrayCompile
 
 open System
 
-def getFilePathExtension (fp : FilePath) : String :=
-  match fp.extension with
-  | none => ""
-  | some s => s
-
 partial def getFilePathsList (fp : FilePath) (acc : List FilePath := []) :
 IO (List FilePath) := do
   if ← fp.isDir then
@@ -16,7 +11,7 @@ IO (List FilePath) := do
         extra ← extra.concat innerFp
     acc ++ extra
   else
-    if (getFilePathExtension fp) = "lean" then
+    if (fp.extension.getD "") = "lean" then
       acc.concat fp
     else
       acc
@@ -30,7 +25,7 @@ def main (args : List String): IO UInt32 := do
     let input : FilePath := ⟨args.get! 0⟩
     -- validating input target
     if ¬(← input.isDir) then
-      if (getFilePathExtension input) ≠ "lean" then
+      if (input.extension.getD "") ≠ "lean" then
         IO.eprintln "If the input is a file, it must be a .lean file"
         return 1
     let output : FilePath := ⟨args.get! 1⟩
@@ -39,7 +34,7 @@ def main (args : List String): IO UInt32 := do
       IO.eprintln "Target output cannot be a directory"
       return 1
     else
-      if (getFilePathExtension output) ≠ "cpp" then
+      if (output.extension.getD "") ≠ "cpp" then
         IO.eprintln "Target output must be a .cpp file"
         return 1
     Lean.initSearchPath (← Lean.findSysroot?)

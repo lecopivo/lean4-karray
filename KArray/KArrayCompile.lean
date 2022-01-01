@@ -78,7 +78,7 @@ MetaM ((List String) × String) :=
     (args.data.map formattedName, (← toCCode compilationUnits body))
   | _ => throwError "Function expected!"
 
-partial def metaCompile (compilationUnits : List CompilationUnit) (declName : Name) :
+def metaCompile (compilationUnits : List CompilationUnit) (declName : Name) :
 MetaM (String × String × String) := do
   let metaExpr ← whnf $ mkConst declName
   let returnType ← getReturnType declName
