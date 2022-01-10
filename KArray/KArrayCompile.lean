@@ -62,10 +62,6 @@ def toCCode (compilationUnits : List CompilationUnit) (e : Expr) : MetaM String 
     -- TODO: if `f` is not reflected, check if it's a marked declaration. otherwise:
     throwError "Invalid Expression"
 
-def getReturnType (declName : Name) : MetaM String := do
-  Meta.forallTelescope (← getConstInfo declName).type fun _ type =>
-    typeTranslationHashMap.find! $ toString type
-
 def getArgsTypes (e : Expr) (acc : List String := []) : MetaM (List String) :=
   match e with
   | Expr.lam _ t e' _ => getArgsTypes e' (acc.concat $ toString t)
@@ -78,16 +74,21 @@ MetaM ((List String) × String) :=
     (args.data.map formattedName, (← toCCode compilationUnits body))
   | _ => throwError "Function expected!"
 
+def buildArgs (argsTypes argNames : List String) : String :=
+  ",".intercalate $ (argsTypes.zip argNames).map λ (type, name) =>
+    s!"{typeTranslationHashMap.find! type} {name}"
+
+def getReturnType (declName : Name) : MetaM String := do
+  Meta.forallTelescope (← getConstInfo declName).type fun _ type =>
+    typeTranslationHashMap.find! $ toString type
+
 def metaCompile (compilationUnits : List CompilationUnit) (declName : Name) :
 MetaM (String × String × String) := do
   let metaExpr ← whnf $ mkConst declName
-  let returnType ← getReturnType declName
   let argsTypes ← getArgsTypes metaExpr
   let (argNames, body) ← getArgsNamesAndBody compilationUnits metaExpr
-  (returnType,
-    ",".intercalate $ (argsTypes.zip argNames).map λ (type, name) =>
-      s!"{typeTranslationHashMap.find! type} {name}",
-    body)
+  let returnType ← getReturnType declName
+  (buildArgs argsTypes argNames, body, returnType)
 
 def collectCompilationUnits (filePath : FilePath) : IO (List CompilationUnit) := do
   let input ← IO.FS.readFile filePath
@@ -145,7 +146,7 @@ The body is a string like:
 def processCompilationUnit (compilationUnits : List CompilationUnit)
 (compilationUnit : CompilationUnit) : IO (String × String) := do
   let env ← compilationUnit.env
-  let (returnType, args, body) ← Prod.fst <$>
+  let (args, body, returnType) ← Prod.fst <$>
     (metaCompile compilationUnits compilationUnit.declName).run'.toIO {} {env}
   let header ← s!"external {returnType} {compilationUnit.targetName}({args})"
   (header, s!"\{return {body};}")
