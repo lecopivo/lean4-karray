@@ -14,6 +14,8 @@ structure CompilationUnit where
 class Reflected (a : α)
 
 instance : Reflected (λ x => Float.sqrt x) := ⟨⟩
+instance : Reflected (λ x y => Float.add x y) := ⟨⟩
+instance : Reflected Float.add := ⟨⟩
 
 def typeTranslationList : List (String × String) := [
   ("Float", "double")
@@ -48,7 +50,7 @@ def eName (e : Expr) : String :=
 * functions supported out-of-the-box like add, mul, sqrt, cos etc or
 * other compiled functions
 -/
-def toCCode (compilationUnits : List CompilationUnit) (e : Expr) : MetaM String :=
+partial def toCCode (compilationUnits : List CompilationUnit) (e : Expr) : MetaM String :=
   match e with
   | Expr.fvar _ _=> eName e
   | Expr.app f x _ => do
@@ -56,8 +58,18 @@ def toCCode (compilationUnits : List CompilationUnit) (e : Expr) : MetaM String 
     let s ← synthInstance? (← mkAppM `Reflected #[f])
     match s with
     | some _ => eName f ++ "(" ++ (← toCCode compilationUnits x) ++ ")"
-    | none => (← toCCode compilationUnits f) ++
-      "(" ++ (← toCCode compilationUnits x) ++ ")"
+    | none => do
+      let X ← inferType x
+      let s' ← synthInstance? (← mkAppM `Reflected #[X])
+      match s' with
+      | some _ =>
+        (← toCCode compilationUnits f) ++ "(" ++ (← toCCode compilationUnits x) ++ ")"
+      | none => do
+        let e' ← whnf e
+        if e' == e then
+          throwError "nope"
+        else
+          toCCode compilationUnits e'
   | _ =>
     -- TODO: if `f` is not reflected, check if it's a marked declaration. otherwise:
     throwError "Invalid Expression"
