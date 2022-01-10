@@ -11,11 +11,12 @@ structure CompilationUnit where
   declName   : Name
   targetName : String
 
-class Reflected (a : α)
+class Reflected (a : α) where
+  name : String
 
-instance : Reflected (λ x => Float.sqrt x) := ⟨⟩
-instance : Reflected (λ x y => Float.add x y) := ⟨⟩
-instance : Reflected Float.add := ⟨⟩
+instance : Reflected Float := ⟨"flaot"⟩
+instance : Reflected (λ x => Float.sqrt x) := ⟨"sqrt"⟩
+instance : Reflected (λ x y => Float.add x y) := ⟨"add"⟩
 
 def typeTranslationList : List (String × String) := [
   ("Float", "double")
@@ -50,29 +51,41 @@ def eName (e : Expr) : String :=
 * functions supported out-of-the-box like add, mul, sqrt, cos etc or
 * other compiled functions
 -/
-partial def toCCode (compilationUnits : List CompilationUnit) (e : Expr) : MetaM String :=
-  match e with
-  | Expr.fvar _ _=> eName e
-  | Expr.app f x _ => do
-    -- Is `f` reflected?
-    let s ← synthInstance? (← mkAppM `Reflected #[f])
-    match s with
-    | some _ => eName f ++ "(" ++ (← toCCode compilationUnits x) ++ ")"
-    | none => do
+partial def toCCode (compilationUnits : List CompilationUnit) (e' : Expr) : MetaM String := do
+  match e' with
+  | Expr.fvar _ _=> eName e'
+  | Expr.letE .. => lambdaLetTelescope e' fun args body => 
+    do 
+      let mut r := ""
+      for i in [0:args.size] do
+        let X ← inferType args[i]
+        let s ← synthInstance? (← mkAppM `Reflected #[X])
+        match s with
+        | some _ => 
+          -- get and return Reflected.name instead of X.constName
+          r := r ++ s!"{X.constName!} {args[i]} = {← toCCode compilationUnits (← whnf args[i])};\n"
+        | none => throwError "\nThe type `{X}` of variable `{args[i]}` is not Reflected!\nPlease provide `instance : Reflected {X}`"
+      r ++ (← toCCode compilationUnits body)
+  | e' => do       
+  let e ← whnfI e'  -- only whnfI as we do not want to reduce fvars to their definitions
+  let s ← synthInstance? (← mkAppM `Reflected #[e])
+  match s with
+  | some _ => e.constName!.toString ++ "(" -- get and return Reflected.name instead of e.constName
+  | none => do
+    match e with
+    | Expr.app f x _ => do
       let X ← inferType x
       let s' ← synthInstance? (← mkAppM `Reflected #[X])
       match s' with
       | some _ =>
-        (← toCCode compilationUnits f) ++ "(" ++ (← toCCode compilationUnits x) ++ ")"
-      | none => do
-        let e' ← whnf e
-        if e' == e then
-          throwError "nope"
+        let E ← inferType e
+        let r ← (← toCCode compilationUnits f) ++ (← toCCode compilationUnits x)
+        if E.isForall then 
+          r ++ ", "
         else
-          toCCode compilationUnits e'
-  | _ =>
-    -- TODO: if `f` is not reflected, check if it's a marked declaration. otherwise:
-    throwError "Invalid Expression"
+          r ++ ")"
+      | none => throwError "Failed to compile {e}!"
+    | _ => throwError "Invalid Expression"
 
 def getArgsTypes (e : Expr) (acc : List String := []) : MetaM (List String) :=
   match e with
@@ -161,7 +174,7 @@ def processCompilationUnit (compilationUnits : List CompilationUnit)
   let (args, body, returnType) ← Prod.fst <$>
     (metaCompile compilationUnits compilationUnit.declName).run'.toIO {} {env}
   let header ← s!"external {returnType} {compilationUnit.targetName}({args})"
-  (header, s!"\{return {body};}")
+  (header, s!"\{\n{body};\n}")
 
 def cIncludes : String :=
   "#include <lean/lean.h>\n" ++
