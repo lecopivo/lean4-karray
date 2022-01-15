@@ -1,5 +1,8 @@
 # lean4-karray
 
+A WIP package that allows automatic C code generation for functions defined in
+Lean.
+
 ## Usage
 
 1. Add `KArray` as a dependency of your package:
