@@ -10,9 +10,9 @@ script reset do
     cmd := "lake"
     args := #["clean"]
   }
-  let cleanCpp ← IO.Process.output { -- TODO: this is not working
+  let cleanCpp ← IO.Process.output {
     cmd := "rm"
-    args := #["examples/*.cpp"]
+    args := #["examples/output.c"]
   }
   return 0
 
@@ -32,7 +32,7 @@ script test do
   let kArrayPath := FilePath.mk "build" / "bin" / "KArray"
   let runExamples ← IO.Process.output {
     cmd := kArrayPath.withExtension FilePath.exeExtension |>.toString
-    args := #["examples", "examples/output.cpp"]
+    args := #["examples", "examples/output.c"]
     env := #[("LEAN_PATH", SearchPath.toString [kArrayLib])]
   }
   if runExamples.exitCode ≠ 0 then

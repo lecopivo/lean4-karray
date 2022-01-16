@@ -55,13 +55,13 @@ import KArray.KArrayCompile
 4. Run the `kcompile script`:
 
 ```bash
-$ lake run kcompile -- src output.cpp
+$ lake run kcompile -- src output.c
 ```
 
 Where `src` is the directory where your Lean code is located. `KArray` also
 accepts a single Lean file as input.
 
-The command above should generate an `output.cpp` file, which can be compiled
+The command above should generate an `output.c` file, which can be compiled
 and used with Lean's FFI.
 
 If you create other functions of change the ones tagged with `kcompile`, you

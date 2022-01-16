@@ -19,7 +19,7 @@ IO (List FilePath) := do
 def main (args : List String): IO UInt32 := do
   if args.length ≠ 2 then
     let appName := (← IO.appPath).fileName.getD "extern"
-    IO.eprintln s!"Usage: {appName} <dir or lean-file> <cpp-file>"
+    IO.eprintln s!"Usage: {appName} <dir or lean-file> <c-file>"
     return 1
   else
     let input : FilePath := ⟨args.get! 0⟩
@@ -34,8 +34,8 @@ def main (args : List String): IO UInt32 := do
       IO.eprintln "Target output cannot be a directory"
       return 1
     else
-      if (output.extension.getD "") ≠ "cpp" then
-        IO.eprintln "Target output must be a .cpp file"
+      if (output.extension.getD "") ≠ "c" then
+        IO.eprintln "Target output must be a .c file"
         return 1
     Lean.initSearchPath (← Lean.findSysroot?)
     let mut compilationUnits : List CompilationUnit ← []
