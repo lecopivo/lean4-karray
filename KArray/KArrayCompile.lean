@@ -57,12 +57,7 @@ partial def toCCode (compilationUnits : List CompilationUnit) (e' : Expr) :
                   if (← inferType e).isForall then r ++ ","
                   else r ++ ")"
                 | none   => throwError "Failed to compile `{t}`"
-            | _              =>
-              let declName : String ← toString e
-              for compilationUnit in compilationUnits do
-                if declName = toString compilationUnit.declName then
-                  return compilationUnit.targetName
-              throwError "Invalid Expression `{e}`"
+            | _              => throwError "Invalid Expression `{e}`"
 
 def getArgsTypes (e : Expr) (acc : List Expr := []) : MetaM (List Expr) :=
   match e with
