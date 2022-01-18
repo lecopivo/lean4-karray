@@ -75,12 +75,17 @@ def buildArgs (argsTypes : List Expr) (argNames : List String) :
     MetaM String := do
   let mut res : List String ← []
   for (type, name) in argsTypes.zip argNames do
-    res ← res.concat s!"{← reflectedName type} {name}"
+    match ← synthInstance? (← mkAppM `Reflected #[type]) with
+      | some _ => res ← res.concat s!"{← reflectedName type} {name}"
+      | none   => throwError "Failed to compile `{type}`"
   ",".intercalate res
 
 def getReturnType (declName : Name) : MetaM String := do
   Meta.forallTelescope (← getConstInfo declName).type
-    fun _ type => reflectedName type
+    fun _ type => do
+      match ← synthInstance? (← mkAppM `Reflected #[type]) with
+        | some _ => reflectedName type
+        | none   => throwError "Failed to compile `{type}`"
 
 def metaCompile (compilationUnits : List CompilationUnit) (declName : Name) :
 MetaM (String × String × String) := do
