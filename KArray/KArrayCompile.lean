@@ -14,10 +14,9 @@ structure CompilationUnit where
 class Reflected (a : α) where
   name : String
 
-instance : Reflected Float := ⟨"flaot"⟩
-instance : Reflected (λ x => Float.sqrt x) := ⟨"sqrt"⟩
-instance : Reflected (λ x y => Float.add x y) := ⟨"add"⟩
+instance : Reflected Float := ⟨"float"⟩
 
+-- TODO: get rid of these
 def typeTranslationList : List (String × String) := [
   ("Float", "double")
 ]
@@ -51,41 +50,43 @@ def eName (e : Expr) : String :=
 * functions supported out-of-the-box like add, mul, sqrt, cos etc or
 * other compiled functions
 -/
-partial def toCCode (compilationUnits : List CompilationUnit) (e' : Expr) : MetaM String := do
+partial def toCCode (compilationUnits : List CompilationUnit) (e' : Expr) :
+    MetaM String := do
   match e' with
-  | Expr.fvar _ _=> eName e'
-  | Expr.letE .. => lambdaLetTelescope e' fun args body => 
-    do 
+    | Expr.fvar _ _ => eName e'
+    | Expr.letE ..  => lambdaLetTelescope e' fun args body => do
       let mut r := ""
-      for i in [0:args.size] do
+      for i in [0 : args.size] do
         let X ← inferType args[i]
         let s ← synthInstance? (← mkAppM `Reflected #[X])
         match s with
-        | some _ => 
-          -- get and return Reflected.name instead of X.constName
-          r := r ++ s!"{X.constName!} {args[i]} = {← toCCode compilationUnits (← whnf args[i])};\n"
-        | none => throwError "\nThe type `{X}` of variable `{args[i]}` is not Reflected!\nPlease provide `instance : Reflected {X}`"
+          | some _ =>
+            -- get and return Reflected.name instead of X.constName
+            r ← r ++ s!"{typeTranslationHashMap.find! X.constName!.toString} " ++
+              s!"{eName args[i]} = {← toCCode compilationUnits (← whnf args[i])};\n"
+          | none => throwError s!"\nThe type `{X}` of variable `{args[i]}` is not Reflected!\n" ++
+            s!"Please provide `instance : Reflected {X}`"
       r ++ (← toCCode compilationUnits body)
-  | e' => do       
-  let e ← whnfI e'  -- only whnfI as we do not want to reduce fvars to their definitions
-  let s ← synthInstance? (← mkAppM `Reflected #[e])
-  match s with
-  | some _ => e.constName!.toString ++ "(" -- get and return Reflected.name instead of e.constName
-  | none => do
-    match e with
-    | Expr.app f x _ => do
-      let X ← inferType x
-      let s' ← synthInstance? (← mkAppM `Reflected #[X])
-      match s' with
-      | some _ =>
-        let E ← inferType e
-        let r ← (← toCCode compilationUnits f) ++ (← toCCode compilationUnits x)
-        if E.isForall then 
-          r ++ ", "
-        else
-          r ++ ")"
-      | none => throwError "Failed to compile {e}!"
-    | _ => throwError "Invalid Expression"
+    | e' =>
+      let e ← whnfI e' -- only whnfI as we do not want to reduce fvars to their definitions
+      let s ← synthInstance? (← mkAppM `Reflected #[e])
+      match s with
+        | some _ => e.constName!.toString ++ "(" -- get and return Reflected.name instead of e.constName
+        | none =>
+          match e with
+            | Expr.app f x _ =>
+              let X ← inferType x
+              let s' ← synthInstance? (← mkAppM `Reflected #[X])
+              match s' with
+                | some _ =>
+                  let E ← inferType e
+                  let r ← (← toCCode compilationUnits f) ++ (← toCCode compilationUnits x)
+                  if E.isForall then
+                    r ++ ","
+                  else
+                    r ++ ")"
+                | none => throwError "Failed to compile {e}!"
+            | _ => throwError "Invalid Expression"
 
 def getArgsTypes (e : Expr) (acc : List String := []) : MetaM (List String) :=
   match e with
