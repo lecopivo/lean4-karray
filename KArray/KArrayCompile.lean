@@ -14,99 +14,78 @@ structure CompilationUnit where
 class Reflected (a : α) where
   name : String
 
-instance : Reflected Float := ⟨"float"⟩
-
--- TODO: get rid of these
-def typeTranslationList : List (String × String) := [
-  ("Float", "double")
-]
-
-def functionTranslationList : List (String × String) := [
-  ("Float.sqrt", "sqrt")
-]
-
-def hashMapFromList (l : List (String × String)) : HashMap String String := Id.run do
-  let mut m : HashMap String String ← HashMap.empty
-  for (a, b) in l do
-    m ← m.insert a b
-  m
-
-def typeTranslationHashMap : HashMap String String :=
-  hashMapFromList typeTranslationList
-
-def functionTranslationHashMap : HashMap String String :=
-  hashMapFromList functionTranslationList
+instance : Reflected Float := ⟨"double"⟩
 
 def formattedName (e : Expr) : String :=
-  toString e |>.replace "." "_"
+  "x_" ++ (toString e |>.splitOn "." |>.getLast!)
 
-def eName (e : Expr) : String :=
-  match e.getAppFn.constName? with
-  | some n => functionTranslationHashMap.find! n.toString
-  | none => formattedName e
+-- TODO: get and return Reflected.name instead
+def reflectedName (e : Expr) : MetaM String :=
+  e.constName!.toString
 
-/-
-# TODO: make sure compiled functions only depend on either:
-* functions supported out-of-the-box like add, mul, sqrt, cos etc or
-* other compiled functions
--/
+-- TODO: compiled functions without reflected instances (replace by their C names)
+-- TODO: place "return" properly
 partial def toCCode (compilationUnits : List CompilationUnit) (e' : Expr) :
     MetaM String := do
   match e' with
-    | Expr.fvar _ _ => eName e'
+    | Expr.fvar _ _ => formattedName e'
     | Expr.letE ..  => lambdaLetTelescope e' fun args body => do
-      let mut r := ""
+      let mut r ← ""
       for i in [0 : args.size] do
-        let X ← inferType args[i]
-        let s ← synthInstance? (← mkAppM `Reflected #[X])
-        match s with
+        let t ← inferType args[i]
+        match ← synthInstance? (← mkAppM `Reflected #[t]) with
           | some _ =>
-            -- get and return Reflected.name instead of X.constName
-            r ← r ++ s!"{typeTranslationHashMap.find! X.constName!.toString} " ++
-              s!"{eName args[i]} = {← toCCode compilationUnits (← whnf args[i])};\n"
-          | none => throwError s!"\nThe type `{X}` of variable `{args[i]}` is not Reflected!\n" ++
-            s!"Please provide `instance : Reflected {X}`"
+            r ← r ++ s!"{← reflectedName t} " ++ -- type declaration
+              s!"{formattedName args[i]} = " ++ -- variable name
+              s!"{← toCCode compilationUnits (← whnf args[i])};\n" -- computation
+          | none   =>
+            throwError s!"The type `{t}` of variable `{args[i]}` is not Reflected!\n" ++
+            s!"Please provide `instance : Reflected {t}`"
       r ++ (← toCCode compilationUnits body)
-    | e' =>
+    | e'            =>
       let e ← whnfI e' -- only whnfI as we do not want to reduce fvars to their definitions
-      let s ← synthInstance? (← mkAppM `Reflected #[e])
-      match s with
-        | some _ => e.constName!.toString ++ "(" -- get and return Reflected.name instead of e.constName
-        | none =>
+      match ← synthInstance? (← mkAppM `Reflected #[e]) with
+        | some _ => (← reflectedName e) ++ "("
+        | none   =>
           match e with
             | Expr.app f x _ =>
-              let X ← inferType x
-              let s' ← synthInstance? (← mkAppM `Reflected #[X])
-              match s' with
+              let t ← inferType x
+              match ← synthInstance? (← mkAppM `Reflected #[t]) with
                 | some _ =>
-                  let E ← inferType e
-                  let r ← (← toCCode compilationUnits f) ++ (← toCCode compilationUnits x)
-                  if E.isForall then
-                    r ++ ","
-                  else
-                    r ++ ")"
-                | none => throwError "Failed to compile {e}!"
-            | _ => throwError "Invalid Expression"
+                  let r ← (← toCCode compilationUnits f) ++
+                    (← toCCode compilationUnits x)
+                  if (← inferType e).isForall then r ++ ","
+                  else r ++ ")"
+                | none   => throwError "Failed to compile `{t}`"
+            | _              =>
+              let declName : String ← toString e
+              for compilationUnit in compilationUnits do
+                if declName = toString compilationUnit.declName then
+                  return compilationUnit.targetName
+              throwError "Invalid Expression `{e}`"
 
-def getArgsTypes (e : Expr) (acc : List String := []) : MetaM (List String) :=
+def getArgsTypes (e : Expr) (acc : List Expr := []) : MetaM (List Expr) :=
   match e with
-  | Expr.lam _ t e' _ => getArgsTypes e' (acc.concat $ toString t)
-  | _ => acc
+  | Expr.lam _ t e' _ => getArgsTypes e' (acc.concat $ t)
+  | _                 => acc
 
 def getArgsNamesAndBody (compilationUnits : List CompilationUnit) (e : Expr) :
 MetaM ((List String) × String) :=
   match e with
   | Expr.lam .. => lambdaTelescope e fun args body => do
     (args.data.map formattedName, (← toCCode compilationUnits body))
-  | _ => throwError "Function expected!"
+  | _           => throwError "Function expected!"
 
-def buildArgs (argsTypes argNames : List String) : String :=
-  ",".intercalate $ (argsTypes.zip argNames).map λ (type, name) =>
-    s!"{typeTranslationHashMap.find! type} {name}"
+def buildArgs (argsTypes : List Expr) (argNames : List String) :
+    MetaM String := do
+  let mut res : List String ← []
+  for (type, name) in argsTypes.zip argNames do
+    res ← res.concat s!"{← reflectedName type} {name}"
+  ",".intercalate res
 
 def getReturnType (declName : Name) : MetaM String := do
-  Meta.forallTelescope (← getConstInfo declName).type fun _ type =>
-    typeTranslationHashMap.find! $ toString type
+  Meta.forallTelescope (← getConstInfo declName).type
+    fun _ type => reflectedName type
 
 def metaCompile (compilationUnits : List CompilationUnit) (declName : Name) :
 MetaM (String × String × String) := do
@@ -114,7 +93,7 @@ MetaM (String × String × String) := do
   let argsTypes ← getArgsTypes metaExpr
   let (argNames, body) ← getArgsNamesAndBody compilationUnits metaExpr
   let returnType ← getReturnType declName
-  (buildArgs argsTypes argNames, body, returnType)
+  (← buildArgs argsTypes argNames, body, returnType)
 
 def collectCompilationUnits (filePath : FilePath) : IO (List CompilationUnit) := do
   let input ← IO.FS.readFile filePath
@@ -191,7 +170,7 @@ def newLine : String := "\n"
 def semicolonNewLine : String := semicolon ++ newLine
 
 def buildFinalCCode (cHeadersAndBodies : List (String × String)) : String :=
-  let cHeaders := cHeadersAndBodies.map λ (h, _) => h
+  let cHeaders := cHeadersAndBodies.map fun (h, _) => h
   cIncludes ++ newLine ++ cDefines ++ newLine ++ -- includes and defines
     (semicolonNewLine.intercalate cHeaders ++ semicolonNewLine) ++ --headers
-    (newLine.intercalate $ cHeadersAndBodies.map λ (a, b) => a ++ b) -- declarations
+    (newLine.intercalate $ cHeadersAndBodies.map fun (a, b) => a ++ b) -- declarations
