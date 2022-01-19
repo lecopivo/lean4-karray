@@ -90,22 +90,15 @@ def getReturnType (declName : Name) : MetaM String := do
         | some _ => reflectedName type
         | none   => throwError "Failed to compile `{type}`"
 
-def List.enumerateAux : Nat → List α → List (Nat × α)
-  | _, nil      => nil
-  | n, cons h t => (n, h) :: enumerateAux (n + 1) t
-
-def List.enumerate (l : List α) : List (Nat × α) :=
-  l.enumerateAux 0
-
-def withReturn (body : String) : String := Id.run do
+def formatBody (body : String) : String := Id.run do
   let split ← body.splitOn "\n"
   let splitLength ← split.length
   let mut res : List String := []
-  for (i, line) in split.enumerate do
+  for (i, line) in split.enum do
     if i = splitLength - 1 then
-      res ← res.concat $ "return " ++ line
+      res ← res.concat $ "    return " ++ line
     else
-      res ← res.concat line
+      res ← res.concat $ "    " ++ line
   "\n".intercalate res
 
 def metaCompile (compilationUnits : List CompilationUnit) (declName : Name) :
@@ -114,7 +107,7 @@ MetaM (String × String × String) := do
   let argsTypes ← getArgsTypes metaExpr
   let (argNames, body) ← getArgsNamesAndBody compilationUnits metaExpr
   let returnType ← getReturnType declName
-  (← buildArgs argsTypes argNames, withReturn body, returnType)
+  (← buildArgs argsTypes argNames, formatBody body, returnType)
 
 def collectCompilationUnits (filePath : FilePath) : IO (List CompilationUnit) := do
   let input ← IO.FS.readFile filePath
@@ -159,16 +152,6 @@ def validateCompilationUnits (compilationUnits : List CompilationUnit) : IO PUni
         s!"target name '{compilationUnit.targetName}' on declaration `{compilationUnit.declName}`."
     targetNamesSet ← targetNamesSet.insert compilationUnit.targetName
 
-/-
-The header is a string like:
-  "external double add(double x, double y)"
-
-Notice that "x" and "y" could be hidden in a header, but it's better to explicit them
-so we can reuse the header when defining the function itself.
-
-The body is a string like:
-  "{return x + y;}"
--/
 def processCompilationUnit (compilationUnits : List CompilationUnit)
 (compilationUnit : CompilationUnit) : IO (String × String) := do
   let env ← compilationUnit.env
@@ -184,14 +167,19 @@ def cIncludes : String :=
 def cDefines : String :=
   "#define external extern \"C\" LEAN_EXPORT"
 
-def semicolon : String := ";"
-
 def newLine : String := "\n"
 
-def semicolonNewLine : String := semicolon ++ newLine
+def emptyLine : String := newLine ++ newLine
+
+def semicolonNewLine : String := ";" ++ newLine
 
 def buildFinalCCode (cHeadersAndBodies : List (String × String)) : String :=
   let cHeaders := cHeadersAndBodies.map fun (h, _) => h
-  cIncludes ++ newLine ++ cDefines ++ newLine ++ -- includes and defines
-    (semicolonNewLine.intercalate cHeaders ++ semicolonNewLine) ++ --headers
-    (newLine.intercalate $ cHeadersAndBodies.map fun (a, b) => a ++ b) -- declarations
+  -- includes and defines:
+  cIncludes ++ emptyLine ++ cDefines ++ emptyLine ++
+  -- headers:
+    (semicolonNewLine.intercalate cHeaders ++ semicolonNewLine) ++ newLine ++
+  -- declarations:
+    (emptyLine.intercalate $ cHeadersAndBodies.map fun (a, b) => a ++ b) ++
+  -- an empty line so git doesn't complain about it
+    newLine
