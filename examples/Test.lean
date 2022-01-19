@@ -5,8 +5,10 @@ instance : Reflected Float.sqrt := ⟨"sqrt"⟩
 instance : Reflected Float.add  := ⟨"add"⟩
 instance : Reflected Float.mul  := ⟨"mul"⟩
 
+@[kcompile, extern "c_id"] def floatId (x : Float) : Float := x
+
 @[kcompile, extern "c_sqrt_sqrt"] def sqrtSqrt (x : Float) : Float :=
-  Float.sqrt (Float.sqrt x)
+  Float.sqrt (Float.sqrt $ floatId x)
 
 @[kcompile, extern "c_add"] def add (x y : Float) : Float :=
   let t1 := x + y

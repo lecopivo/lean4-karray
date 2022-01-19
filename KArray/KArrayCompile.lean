@@ -23,8 +23,6 @@ def formattedName (e : Expr) : String :=
 def reflectedName (e : Expr) : MetaM String :=
   e.constName!.toString
 
--- TODO: compiled functions without reflected instances (replace by their C names)
--- TODO: place "return" properly
 partial def toCCode (compilationUnits : List CompilationUnit) (e' : Expr) :
     MetaM String := do
   match e' with
@@ -57,7 +55,12 @@ partial def toCCode (compilationUnits : List CompilationUnit) (e' : Expr) :
                   if (← inferType e).isForall then r ++ ","
                   else r ++ ")"
                 | none   => throwError "Failed to compile `{t}`"
-            | _              => throwError "Invalid Expression `{e}`"
+            | _              =>
+              let declNameStr : String ← toString e
+              for compilationUnit in compilationUnits do
+                if declNameStr = toString compilationUnit.declName then
+                  return compilationUnit.targetName ++ "("
+              throwError "Invalid Expression `{e}`"
 
 def getArgsTypes (e : Expr) (acc : List Expr := []) : MetaM (List Expr) :=
   match e with
@@ -87,13 +90,31 @@ def getReturnType (declName : Name) : MetaM String := do
         | some _ => reflectedName type
         | none   => throwError "Failed to compile `{type}`"
 
+def List.enumerateAux : Nat → List α → List (Nat × α)
+  | _, nil      => nil
+  | n, cons h t => (n, h) :: enumerateAux (n + 1) t
+
+def List.enumerate (l : List α) : List (Nat × α) :=
+  l.enumerateAux 0
+
+def withReturn (body : String) : String := Id.run do
+  let split ← body.splitOn "\n"
+  let splitLength ← split.length
+  let mut res : List String := []
+  for (i, line) in split.enumerate do
+    if i = splitLength - 1 then
+      res ← res.concat $ "return " ++ line
+    else
+      res ← res.concat line
+  "\n".intercalate res
+
 def metaCompile (compilationUnits : List CompilationUnit) (declName : Name) :
 MetaM (String × String × String) := do
   let metaExpr ← whnf $ mkConst declName
   let argsTypes ← getArgsTypes metaExpr
   let (argNames, body) ← getArgsNamesAndBody compilationUnits metaExpr
   let returnType ← getReturnType declName
-  (← buildArgs argsTypes argNames, body, returnType)
+  (← buildArgs argsTypes argNames, withReturn body, returnType)
 
 def collectCompilationUnits (filePath : FilePath) : IO (List CompilationUnit) := do
   let input ← IO.FS.readFile filePath
