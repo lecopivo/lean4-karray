@@ -3,6 +3,11 @@ open Lake DSL System
 
 package KArray {
   supportInterpreter := true
+  dependencies := #[{
+    name := `mathlib
+    src := Source.git "https://github.com/leanprover-community/mathlib4.git" "fe835a126539f55ce9dcc5705575d01eb1057625"
+  }]
+
 }
 
 script reset do

@@ -1,6 +1,8 @@
 import Lean
+import Mathlib.Util.Eval
+import Mathlib.Util.TermUnsafe
 
-open Lean Meta System Std
+open Lean Meta System Std 
 
 initialize kArrayCompileAttr : TagAttribute ←
   registerTagAttribute `kcompile "tag to request KArray compile"
@@ -20,8 +22,12 @@ def formattedName (e : Expr) : String :=
   "x_" ++ (toString e |>.splitOn "." |>.getLast!)
 
 -- TODO: get and return Reflected.name instead
-def reflectedName (e : Expr) : MetaM String :=
-  e.constName!.toString
+open Mathlib.Eval in
+def reflectedName (e : Expr) : MetaM String := do
+  let e ← (← mkAppOptM `Reflected.name #[none, some $ mkConst `Float, none])
+  let f ← unsafe evalExpr String (mkConst `String) e
+  return f
+  -- e.constName!.toString
 
 partial def toCCode (compilationUnits : List CompilationUnit) (e' : Expr) :
     MetaM String := do
