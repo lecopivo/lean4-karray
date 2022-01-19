@@ -52,7 +52,7 @@ partial def toCCode (compilationUnits : List CompilationUnit) (e' : Expr) :
                 | some _ =>
                   let r ← (← toCCode compilationUnits f) ++
                     (← toCCode compilationUnits x)
-                  if (← inferType e).isForall then r ++ ","
+                  if (← inferType e).isForall then r ++ ", "
                   else r ++ ")"
                 | none   => throwError "Failed to compile `{t}`"
             | _              =>
@@ -81,7 +81,7 @@ def buildArgs (argsTypes : List Expr) (argNames : List String) :
     match ← synthInstance? (← mkAppM `Reflected #[type]) with
       | some _ => res ← res.concat s!"{← reflectedName type} {name}"
       | none   => throwError "Failed to compile `{type}`"
-  ",".intercalate res
+  ", ".intercalate res
 
 def getReturnType (declName : Name) : MetaM String := do
   Meta.forallTelescope (← getConstInfo declName).type
