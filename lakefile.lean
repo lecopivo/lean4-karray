@@ -5,7 +5,7 @@ package KArray {
   supportInterpreter := true
   dependencies := #[{
     name := `mathlib
-    src := Source.git "https://github.com/leanprover-community/mathlib4.git" "fe835a126539f55ce9dcc5705575d01eb1057625"
+    src := Source.git "https://github.com/leanprover-community/mathlib4.git" "089ae0a61756a84e383111da1f6697210456ed3a"
   }]
 
 }
@@ -34,11 +34,12 @@ script test do
     IO.eprintln build.stderr
     return build.exitCode
   let kArrayLib := FilePath.mk "build" / "lib"
+  let mathlibLib := FilePath.mk "lean_packages" / "mathlib" / "build" / "lib"
   let kArrayPath := FilePath.mk "build" / "bin" / "KArray"
   let runExamples ← IO.Process.output {
     cmd := kArrayPath.withExtension FilePath.exeExtension |>.toString
     args := #["examples", "examples/output.c"]
-    env := #[("LEAN_PATH", SearchPath.toString [kArrayLib])]
+    env := #[("LEAN_PATH", SearchPath.toString [kArrayLib, mathlibLib])]
   }
   if runExamples.exitCode ≠ 0 then
     IO.eprint runExamples.stderr

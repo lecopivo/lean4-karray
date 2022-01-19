@@ -24,10 +24,10 @@ def formattedName (e : Expr) : String :=
 -- TODO: get and return Reflected.name instead
 open Mathlib.Eval in
 def reflectedName (e : Expr) : MetaM String := do
-  let e ← (← mkAppOptM `Reflected.name #[none, some $ mkConst `Float, none])
+  let e ← (← mkAppOptM `Reflected.name #[none, some $ e, none])
   let f ← unsafe evalExpr String (mkConst `String) e
   return f
-  -- e.constName!.toString
+  -- e.constName!.toString 
 
 partial def toCCode (compilationUnits : List CompilationUnit) (e' : Expr) :
     MetaM String := do
