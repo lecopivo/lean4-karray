@@ -55,7 +55,7 @@ import KArray.KArrayCompile
 4. Run the `kcompile script`:
 
 ```bash
-$ lake run kcompile -- src output.c
+$ lake script run kcompile -- src output.c
 ```
 
 Where `src` is the directory where your Lean code is located. `KArray` also
