@@ -39,8 +39,7 @@ partial def toCCode (compilationUnits : List CompilationUnit) (e' : Expr) :
               s!"{formattedName args[i]} = " ++ -- variable name
               s!"{← toCCode compilationUnits (← whnf args[i])};\n" -- computation
           | none   =>
-            throwError s!"The type `{t}` of variable `{args[i]}` is not Reflected!\n" ++
-            s!"Please provide `instance : Reflected {t}`"
+            throwError s!"Reflected instance of `{t}` is missing."
       r ++ (← toCCode compilationUnits body)
     | e'            =>
       let e ← whnfI e' -- only whnfI as we do not want to reduce fvars to their definitions
@@ -56,13 +55,13 @@ partial def toCCode (compilationUnits : List CompilationUnit) (e' : Expr) :
                     (← toCCode compilationUnits x)
                   if (← inferType e).isForall then r ++ ", "
                   else r ++ ")"
-                | none   => throwError "Failed to compile `{t}`"
+                | none   => throwError "Reflected instance of `{t}` is missing."
             | _              =>
               let declNameStr : String ← toString e
               for compilationUnit in compilationUnits do
                 if declNameStr = toString compilationUnit.declName then
                   return compilationUnit.targetName ++ "("
-              throwError "Invalid Expression `{e}`"
+              throwError "Can't find a reference for the compiled version of `{e}`."
 
 def getArgsTypes (e : Expr) (acc : List Expr := []) : MetaM (List Expr) :=
   match e with
@@ -70,11 +69,11 @@ def getArgsTypes (e : Expr) (acc : List Expr := []) : MetaM (List Expr) :=
   | _                 => acc
 
 def getArgsNamesAndBody (compilationUnits : List CompilationUnit) (e : Expr) :
-MetaM ((List String) × String) :=
+    MetaM ((List String) × String) :=
   match e with
   | Expr.lam .. => lambdaTelescope e fun args body => do
     (args.data.map formattedName, (← toCCode compilationUnits body))
-  | _           => throwError "Function expected!"
+  | _           => throwError "Failed to compile function `{e}`."
 
 def buildArgs (argsTypes : List Expr) (argNames : List String) :
     MetaM String := do
@@ -82,7 +81,7 @@ def buildArgs (argsTypes : List Expr) (argNames : List String) :
   for (type, name) in argsTypes.zip argNames do
     match ← synthInstance? (← mkAppM `Reflected #[type]) with
       | some _ => res ← res.concat s!"{← reflectedName type} {name}"
-      | none   => throwError "Failed to compile `{type}`"
+      | none   => throwError "Failed to compile type `{type}`"
   ", ".intercalate res
 
 def getReturnType (declName : Name) : MetaM String := do
@@ -90,7 +89,7 @@ def getReturnType (declName : Name) : MetaM String := do
     fun _ type => do
       match ← synthInstance? (← mkAppM `Reflected #[type]) with
         | some _ => reflectedName type
-        | none   => throwError "Failed to compile `{type}`"
+        | none   => throwError "Failed to compile type `{type}`"
 
 def formatBody (body : String) : String := Id.run do
   let split ← body.splitOn "\n"
@@ -104,12 +103,15 @@ def formatBody (body : String) : String := Id.run do
   "\n".intercalate res
 
 def metaCompile (compilationUnits : List CompilationUnit) (declName : Name) :
-MetaM (String × String × String) := do
+    MetaM (String × String × String) := do
   let metaExpr ← whnf $ mkConst declName
   let argsTypes ← getArgsTypes metaExpr
   let (argNames, body) ← getArgsNamesAndBody compilationUnits metaExpr
   let returnType ← getReturnType declName
   (← buildArgs argsTypes argNames, formatBody body, returnType)
+
+def buildMessage (filePath : FilePath) (type msg : String) : String :=
+  s!"{type} ({filePath}):\n\t{msg}"
 
 def collectCompilationUnits (filePath : FilePath) : IO (List CompilationUnit) := do
   let input ← IO.FS.readFile filePath
@@ -120,7 +122,7 @@ def collectCompilationUnits (filePath : FilePath) : IO (List CompilationUnit) :=
     for declName in kArrayCompileAttr.ext.getState env do
       match externMap.find? declName with
       | none =>
-        IO.println $ s!"Warning ({filePath}):\n\t`{declName}` isn't marked with " ++
+        IO.println $ buildMessage filePath "Warning" s!"`{declName}` isn't marked with " ++
           "`extern`. Skipping KArray compilation."
       | some data =>
         let mut hasProperStandardEntry ← false
@@ -134,11 +136,11 @@ def collectCompilationUnits (filePath : FilePath) : IO (List CompilationUnit) :=
               break
           | _ => continue -- non-standard entries are ignored
         if ¬hasProperStandardEntry then
-          panic! s!"\nError ({filePath}):\n\t`kcompile` tag requires `{declName}` to " ++
-            "be marked with `extern <targetName>`."
+          panic! buildMessage filePath "\nError" s!"`kcompile` tag requires `{declName}` " ++
+            "to be marked with `extern <targetName>`."
     res
   else
-    panic! s!"\nLean's Frontend failed to run `{filePath}`."
+    panic! buildMessage filePath "\nError" s!"Lean's Frontend failed to run."
 
 -- TODO: check if `targetName` is a valid function name for C code
 def isValidCFunctionName (targetName : String) : Bool := true
@@ -147,20 +149,22 @@ def validateCompilationUnits (compilationUnits : List CompilationUnit) : IO PUni
   let mut targetNamesSet : HashSet String ← HashSet.empty
   for compilationUnit in compilationUnits do
     if ¬(isValidCFunctionName compilationUnit.targetName) then
-      panic! s!"\nError ({compilationUnit.filePath}):\n\tInvalid target name " ++
+      panic! buildMessage compilationUnit.filePath "\nError" "Invalid target name " ++
         s!"'{compilationUnit.targetName}' on declaration `{compilationUnit.declName}`."
     if targetNamesSet.contains compilationUnit.targetName then
-      panic! s!"\nError ({compilationUnit.filePath}):\n\tDuplicated occurrence of " ++
+      panic! buildMessage compilationUnit.filePath "\nError" "Duplicated occurrence of " ++
         s!"target name '{compilationUnit.targetName}' on declaration `{compilationUnit.declName}`."
     targetNamesSet ← targetNamesSet.insert compilationUnit.targetName
 
 def processCompilationUnit (compilationUnits : List CompilationUnit)
-(compilationUnit : CompilationUnit) : IO (String × String) := do
+    (compilationUnit : CompilationUnit) : IO (String × String) := do
   let env ← compilationUnit.env
-  let (args, body, returnType) ← Prod.fst <$>
-    (metaCompile compilationUnits compilationUnit.declName).run'.toIO {} {env}
-  let header ← s!"external {returnType} {compilationUnit.targetName}({args})"
-  (header, s!"\{\n{body};\n}")
+  try
+    let (args, body, returnType) ← Prod.fst <$>
+      (metaCompile compilationUnits compilationUnit.declName).run'.toIO {} {env}
+    let header ← s!"external {returnType} {compilationUnit.targetName}({args})"
+    (header, s!"\{\n{body};\n}")
+  catch | e => panic! buildMessage compilationUnit.filePath "\nError" e.toString
 
 def cIncludes : String :=
   "#include <lean/lean.h>\n" ++
