@@ -1,6 +1,7 @@
 import KArray.KArrayCompile
 
 -- instances of Reflected can also be provided at user's code
+instance : Reflected Float      := ⟨"double"⟩
 instance : Reflected Float.sqrt := ⟨"sqrt"⟩
 instance : Reflected Float.add  := ⟨"add"⟩
 instance : Reflected Float.mul  := ⟨"mul"⟩

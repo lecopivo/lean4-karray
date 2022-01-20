@@ -16,18 +16,14 @@ structure CompilationUnit where
 class Reflected (a : α) where
   name : String
 
-instance : Reflected Float := ⟨"double"⟩
-
 def formattedName (e : Expr) : String :=
   "x_" ++ (toString e |>.splitOn "." |>.getLast!)
 
--- TODO: get and return Reflected.name instead
 open Mathlib.Eval in
 def reflectedName (e : Expr) : MetaM String := do
   let e ← (← mkAppOptM `Reflected.name #[none, some $ e, none])
   let f ← unsafe evalExpr String (mkConst `String) e
   return f
-  -- e.constName!.toString 
 
 partial def toCCode (compilationUnits : List CompilationUnit) (e' : Expr) :
     MetaM String := do
