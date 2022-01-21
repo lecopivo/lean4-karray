@@ -1,4 +1,4 @@
-import KArray.KArrayCompile
+import KArray
 
 open System
 

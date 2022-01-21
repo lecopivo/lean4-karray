@@ -47,7 +47,7 @@ Now you should be set to use the `kcompile` tag in your functions.
 The `kcompile` tag needs to be used along with the `extern` tag. Example:
 
 ```lean
-import KArray.KArrayCompile
+import KArray
 
 @[kcompile, extern "c_my_fun"] def myFun (x : Float) := Float.sqrt x
 ```
