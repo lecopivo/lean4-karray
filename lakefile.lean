@@ -38,7 +38,7 @@ script test do
   let kArrayPath := FilePath.mk "build" / "bin" / "KArray"
   let runExamples ← IO.Process.output {
     cmd := kArrayPath.withExtension FilePath.exeExtension |>.toString
-    args := #["examples", "examples/output.c"]
+    args := #["test", "test/output.c"]
     env := #[("LEAN_PATH", SearchPath.toString [kArrayLib, mathlibLib])]
   }
   if runExamples.exitCode ≠ 0 then

@@ -5,7 +5,9 @@ Lean.
 
 ## Usage
 
-1. Add `KArray` as a dependency of your package:
+You can check our [example](examples/KArrayExample) and/or follow the steps below:
+
+1. Add `KArray` as a dependency of your package
 
 ```lean
 package MyPackage {
@@ -16,18 +18,23 @@ package MyPackage {
 }
 ```
 
-2. Add the following script to your `lakefile.lean`:
+2. Add the following script to your `lakefile.lean`
 
 ```lean
 script kcompile (args) do
   let packageLib  ← FilePath.mk "build" / "lib"
+
   let kArrayBuild ← FilePath.mk "lean_packages" / "KArray" / "build"
   let kArrayLib   ← kArrayBuild / "lib"
   let kArrayBin   ← kArrayBuild / "bin" / "KArray"
+
+  let mathlibBuild ← FilePath.mk "lean_packages" / "mathlib" / "build"
+  let mathlibLib   ← mathlibBuild / "lib"
+
   let runExamples ← IO.Process.output {
     cmd := kArrayBin.withExtension FilePath.exeExtension |>.toString
     args := args.toArray
-    env := #[("LEAN_PATH", SearchPath.toString [kArrayLib, packageLib])]
+    env := #[("LEAN_PATH", SearchPath.toString [kArrayLib, packageLib, mathlibLib])]
   }
   if runExamples.exitCode ≠ 0 then
     IO.eprint runExamples.stderr
@@ -36,7 +43,7 @@ script kcompile (args) do
   return runExamples.exitCode
 ```
 
-3. Build `KArray`:
+3. Build `KArray`
 
 ```bash
 $ lake build KArray
@@ -49,13 +56,15 @@ The `kcompile` tag needs to be used along with the `extern` tag. Example:
 ```lean
 import KArray
 
-@[kcompile, extern "c_my_fun"] def myFun (x : Float) := Float.sqrt x
+instance : Reflected Float := ⟨"double"⟩
+
+@[kcompile, extern "c_my_fun"] def myFun (x : Float) := x
 ```
 
-4. Run the `kcompile script`:
+4. Run the `kcompile` script
 
 ```bash
-$ lake script run kcompile -- src output.c
+$ lake script run kcompile src output.c
 ```
 
 Where `src` is the directory where your Lean code is located. `KArray` also

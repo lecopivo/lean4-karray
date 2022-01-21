@@ -1,4 +1,4 @@
-import KArray.KArrayCompile
+import KArray
 
 -- instances of Reflected can also be provided at user's code
 instance : Reflected Float      := ⟨"double"⟩
