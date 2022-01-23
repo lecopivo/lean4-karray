@@ -6,8 +6,14 @@ Build `KArray` with
 $ lake build KArray
 ```
 
-Now compile `Main.lean` to `output.c` with
+Now compile the target Lean file with
 
 ```bash
-lake script run kcompile Main.lean output.c
+$ lake script run kcompile
+```
+
+And finally
+
+```bash
+$ lake build
 ```

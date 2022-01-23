@@ -1,4 +1,5 @@
 import Lake
+
 open Lake DSL System
 
 package KArray {
@@ -7,7 +8,6 @@ package KArray {
     name := `mathlib
     src := Source.git "https://github.com/leanprover-community/mathlib4.git" "fe835a1"
   }]
-
 }
 
 script reset do
@@ -33,9 +33,9 @@ script test do
   if build.exitCode ≠ 0 then
     IO.eprintln build.stderr
     return build.exitCode
-  let kArrayLib := FilePath.mk "build" / "lib"
-  let mathlibLib := FilePath.mk "lean_packages" / "mathlib" / "build" / "lib"
-  let kArrayPath := FilePath.mk "build" / "bin" / "KArray"
+  let kArrayLib ← defaultBuildDir / defaultLibDir
+  let mathlibLib := defaultPackagesDir / "mathlib" / defaultBuildDir / defaultLibDir
+  let kArrayPath := defaultBuildDir / defaultBinDir / "KArray"
   let runExamples ← IO.Process.output {
     cmd := kArrayPath.withExtension FilePath.exeExtension |>.toString
     args := #["test", "test/output.c"]
